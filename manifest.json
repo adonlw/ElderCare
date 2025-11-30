@@ -1,0 +1,17 @@
+{
+  "name": "Nelson Diocese On-the-Go",
+  "short_name": "Nelson Diocese",
+  "description": "Lone worker safety & reporting app",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#1e40af",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ]
+}
