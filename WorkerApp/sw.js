@@ -1,0 +1,1 @@
+const CACHE_NAME='v86.0_1767574373010';const u=['./','./index.html','./manifest.json','./icon.png'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});
