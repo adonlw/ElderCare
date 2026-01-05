@@ -1,0 +1,357 @@
+v89.0<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head><script>
+    // AUTO-INJECTED CONFIG
+    window.OTG_CONFIG = { url: "https://script.google.com/macros/s/AKfycbxOo1SjXdLgQyg-4wX-B3c9pCO6VR7s7wcpQCCdOpVRYsxfXG3SQMxVxNgnfXvrK4LnPQ/exec", org: "Nelson Diocese" };
+    try { 
+        localStorage.setItem('otg_config', JSON.stringify(window.OTG_CONFIG));
+        if(!localStorage.getItem('otg_debug_alert_v89')) {
+            alert("DEBUG: Connected to " + "https://script.google.com/macros/s/AKfycbxOo1SjXdLgQyg-4wX-B3c9pCO6VR7s7wcpQCCdOpVRYsxfXG3SQMxVxNgnfXvrK4LnPQ/exec");
+            localStorage.setItem('otg_debug_alert_v89', 'true');
+        }
+    } catch(e){}
+    </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Safety Worker</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<script src="config.js"></script>
+
+<style>
+body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; height: 100%; width: 100%; overflow: hidden; }
+.page { display: none; height: 100%; width: 100%; flex-direction: column; position: absolute; top: 0; left: 0; background-color: #111827; }
+.page.active { display: flex; z-index: 10; }
+.header-bar { padding: 0.75rem 1rem; background-color: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; }
+.content-area { flex: 1; overflow-y: auto; padding: 1rem; z-index: 10; position: relative; }
+.footer-bar { padding: 1rem; background-color: #111827; border-top: 1px solid #374151; flex-shrink: 0; z-index: 20; }
+.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
+.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 0.2s ease-out; }
+.long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
+.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
+.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+.form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+.chip-btn { background-color: #374151; color: #e5e7eb; font-weight: 600; font-size: 0.75rem; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #4b5563; flex: 1; transition: all 0.1s; }
+.chip-btn:active { background-color: #2563eb; border-color: #3b82f6; transform: scale(0.95); }
+.panic-mode { background-color: #7f1d1d !important; }
+.gps-bar { width: 4px; height: 12px; background-color: #4b5563; border-radius: 1px; transition: background-color 0.3s; }
+.gps-bar.active-green { background-color: #22c55e; }
+.gps-bar.active-amber { background-color: #f59e0b; }
+.gps-bar.active-red { background-color: #ef4444; }
+.menu-icon-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; background: #374151; border-radius: 0.75rem; border: 1px solid #4b5563; text-align: center; padding: 0.5rem; transition: all 0.2s; }
+.menu-icon-btn:active { background: #2563eb; transform: scale(0.95); }
+.wizard-step { display: none; height: 100%; flex-direction: column; }
+.wizard-step.active { display: flex; animation: slideIn 0.3s ease-out; }
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+</style>
+</head>
+<body class="bg-gray-900 text-white">
+<div id="app-container" class="relative h-full w-full">
+<div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">📡 OFFLINE MODE</div>
+<div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">⚠️ Vehicle Check Overdue</div>
+
+<div id="setupWizard" class="hidden fixed inset-0 bg-gray-900 z-[60] flex flex-col overflow-hidden">
+    <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10"><h1 class="text-xl font-bold text-blue-400">Setup</h1></div>
+    <div id="wizStep1" class="wizard-step active p-6 overflow-y-auto">
+        <h2 class="text-2xl font-bold text-white mb-4">Your Details</h2>
+        <input id="wiz_name" class="form-input mb-4" placeholder="Full Name">
+        <input id="wiz_phone" type="tel" class="form-input mb-4" placeholder="Mobile">
+        <input id="wiz_email" type="email" class="form-input mb-8" placeholder="Work Email">
+        <button onclick="wizNext(1)" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg">Next</button>
+    </div>
+    <div id="wizStep2" class="wizard-step p-6 overflow-y-auto">
+        <h2 class="text-2xl font-bold text-white mb-4">Security PINs</h2>
+        <input id="wiz_pin" type="tel" maxlength="4" class="form-input text-center text-xl tracking-widest" placeholder="Standard PIN">
+        <input id="wiz_duress" type="tel" maxlength="4" class="form-input text-center text-xl tracking-widest mt-4" placeholder="Duress PIN (Silent Alarm)">
+        <div class="mt-8 flex gap-2"><button onclick="wizBack(2)" class="flex-1 py-4 bg-gray-700 text-white font-bold rounded-xl">Back</button><button onclick="wizNext(2)" class="flex-1 py-4 bg-blue-600 text-white font-bold rounded-xl">Next</button></div>
+    </div>
+    <div id="wizStep3" class="wizard-step p-6 overflow-y-auto">
+        <h2 class="text-2xl font-bold text-white mb-4">Emergency Contact</h2>
+        <input id="wiz_emg_name" class="form-input" placeholder="Contact Name">
+        <input id="wiz_emg_phone" type="tel" class="form-input" placeholder="Contact Phone">
+        <input id="wiz_emg_email" type="email" class="form-input" placeholder="Contact Email">
+        <div class="mt-8 flex gap-2"><button onclick="wizBack(3)" class="flex-1 py-4 bg-gray-700 text-white font-bold rounded-xl">Back</button><button onclick="wizSave()" class="flex-1 py-4 bg-green-600 text-white font-bold rounded-xl">Save & Start</button></div>
+    </div>
+</div>
+
+<div id="settingsPage" class="page z-50 bg-gray-800">
+    <div class="header-bar"><h1 class="text-2xl font-bold text-white">Settings</h1><button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button></div>
+    <div class="content-area">
+        <div class="p-4 bg-gray-700/50 rounded-xl border border-gray-600 mb-6 flex justify-between items-center">
+            <span class="font-bold text-white">High Risk Mode</span>
+            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="chkHighRisk" class="sr-only peer" onchange="toggleHighRisk()"><div class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:bg-red-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div></label>
+        </div>
+        <button onclick="startWizard()" class="w-full bg-blue-900/50 text-blue-200 py-3 rounded mb-4">Edit My Details</button>
+        <button onclick="forceSync()" class="w-full bg-gray-700 py-3 rounded mb-4 text-white font-bold">Force Sync</button>
+        <button onclick="clearData()" class="w-full bg-red-900/50 text-red-400 py-3 rounded">Reset App</button>
+        <div class="text-center text-xs text-gray-500 mt-6" id="appVersionDisplay"></div>
+    </div>
+</div>
+
+<div id="mainPage" class="page">
+    <div class="header-bar">
+        <div class="flex items-center gap-2"><img src="icon.png" class="w-8 h-8 rounded bg-white object-contain p-1" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400" id="headerOrgName">Safety</h1></div>
+        <div class="flex items-center gap-3">
+            <div id="iconHighRisk" class="hidden animate-pulse text-red-500 text-xl">🛡️</div>
+            <div class="flex gap-0.5"><div id="gps1" class="gps-bar"></div><div id="gps2" class="gps-bar"></div><div id="gps3" class="gps-bar"></div></div>
+            <button onclick="navigate('settings')" class="p-2 text-gray-400">⚙️</button>
+        </div>
+    </div>
+    <div class="content-area">
+        <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer.</div>
+        <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
+        <div id="locationList" class="space-y-3 pb-4"></div>
+        <div class="flex gap-3 mt-4"><button onclick="forceSync()" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600 text-sm">↻ Sync</button><button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl font-bold text-sm">+ Add Manual</button></div>
+    </div>
+    <div class="footer-bar">
+        <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
+            <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm font-bold">Duration</span><span id="durationDisplay" class="font-bold text-blue-400">0 mins</span></div>
+            <div class="flex gap-2 mb-3"><button onclick="quickSetTime(15)" class="chip-btn">15m</button><button onclick="quickSetTime(30)" class="chip-btn">30m</button><button onclick="quickSetTime(60)" class="chip-btn">1h</button></div>
+            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
+        </div>
+        <div class="flex gap-2"><button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl">Quick Notes</button><button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl" disabled>Select Location</button></div>
+    </div>
+</div>
+
+<div id="lockedPage" class="page">
+    <div class="flex-1 flex flex-col justify-between p-6">
+        <div class="flex justify-between items-start"><button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400">🌙</button><button onclick="handlePanicTap()" id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-bold text-white text-2xl border-4 border-red-800 shadow-2xl flex items-center justify-center select-none">SOS</button></div>
+        <div class="text-center">
+            <h2 id="lockedLocationName" class="text-3xl font-bold text-white truncate max-w-[250px] mx-auto"></h2>
+            <div id="countdownTimer" class="text-7xl font-bold font-mono text-white tracking-tighter my-4">00:00</div>
+            <div id="overdueLabel" class="hidden text-red-500 font-black text-2xl animate-pulse tracking-widest border-2 border-red-500 inline-block px-4 py-1 rounded uppercase">OVERDUE</div>
+            <p class="text-gray-400 mt-2">Due: <span id="lockedAnticipatedTime" class="text-blue-400 font-bold"></span></p>
+        </div>
+        <div class="space-y-3 w-full">
+            <div class="flex gap-3"><button id="btnExtend" class="long-press-btn flex-1 py-4 bg-blue-600 text-white font-bold rounded-xl text-lg" onclick="showModal('extend')">Extend</button><button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-xl text-lg">Notes</button></div>
+            <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 text-white font-bold rounded-xl text-lg">HOLD TO END</button>
+            <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 text-white font-bold rounded-xl text-lg animate-pulse">I AM SAFE</button>
+        </div>
+    </div>
+    <div id="batterySaver" class="hidden absolute inset-0 bg-black z-50 flex items-center justify-center flex-col cursor-pointer" onclick="toggleBatterySaver()"><div class="text-gray-600 text-sm mb-4">Tap to wake</div><div class="text-gray-800 font-mono text-xl animate-pulse" id="saverClock">00:00</div></div>
+</div>
+
+<div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-90 hidden items-center justify-center p-4 z-50">
+    <div id="infoModal" class="hidden bg-gray-800 rounded-lg w-full max-w-lg p-6"><h2 id="infoTitle" class="text-xl font-bold text-white mb-2"></h2><div id="siteInfoContent" class="text-gray-300 text-sm mb-4"></div><button onclick="closeModal('info')" class="w-full py-3 bg-gray-600 text-white font-bold rounded">Close</button></div>
+    <div id="extendModal" class="hidden bg-gray-800 rounded-lg w-full max-w-sm p-6 text-center"><h2 class="text-xl font-bold mb-6 text-white">Extend</h2><div class="grid grid-cols-3 gap-3 mb-6"><button onclick="confirmExtension(10)" class="py-4 bg-blue-600 rounded-lg font-bold text-white">+10m</button><button onclick="confirmExtension(15)" class="py-4 bg-blue-600 rounded-lg font-bold text-white">+15m</button><button onclick="confirmExtension(30)" class="py-4 bg-blue-600 rounded-lg font-bold text-white">+30m</button></div><button onclick="closeModal('extend')" class="w-full py-3 bg-gray-700 rounded-lg font-bold text-gray-300">Cancel</button></div>
+    <div id="pinModal" class="hidden bg-gray-800 rounded-lg w-full max-w-xs p-6 text-center"><h2 class="text-xl font-bold mb-4 text-white">Enter PIN</h2><input type="password" id="pinInput" maxlength="4" class="text-center text-3xl tracking-[1em] w-48 mx-auto bg-gray-900 border border-gray-700 rounded-md py-2 px-3 text-white" inputmode="numeric"><div class="mt-6 flex justify-end gap-3"><button onclick="closeModal('pin')" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button id="confirmPinBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Confirm</button></div></div>
+    <div id="templateModal" class="hidden bg-gray-800 rounded-lg w-full max-w-sm p-6 text-center"><h2 class="text-xl font-bold mb-4 text-white">Select Report</h2><div id="templateList" class="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto"></div><button onclick="closeModal('template')" class="mt-4 w-full py-3 bg-gray-600 font-bold text-white">Cancel</button></div>
+    <div id="checkinModal" class="hidden bg-gray-800 rounded-lg w-full max-w-sm p-6 text-center border-4 border-yellow-500"><h2 class="text-2xl font-bold text-yellow-400 mb-4">Are you OK?</h2><div id="checkinCountdown" class="text-6xl font-bold text-yellow-400 mb-6 font-mono">2:00</div><button id="btnCheckinConfirm" class="long-press-btn w-full bg-green-600 text-white font-bold py-4 px-4 rounded-lg text-xl">HOLD TO CONFIRM</button></div>
+    <div id="modal-report" class="hidden bg-gray-800 w-full max-w-lg rounded-xl p-6 max-h-[90vh] flex flex-col border border-gray-700"><h2 class="text-2xl font-bold text-white mb-6 flex-shrink-0" id="reportTitle">Report</h2><div id="reportFields" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2"></div><div class="flex gap-3 flex-shrink-0"><button onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 text-white rounded-xl font-bold">Cancel</button><button id="btnSubmitRep" class="long-press-btn flex-1 py-4 bg-green-600 text-white rounded-xl font-bold">Submit</button></div></div>
+    <div id="locationModal" class="hidden bg-gray-800 rounded-lg w-full max-w-sm p-6"><h2 class="text-xl font-bold mb-4 text-white">Edit Location</h2><input type="hidden" id="locId"><div class="space-y-4"><input type="text" id="locBusiness" class="form-input" placeholder="Business Name"><input type="text" id="locName" class="form-input" placeholder="Site Name"><div class="flex gap-2"><input type="text" id="locAddr" class="form-input mb-0 flex-1"><button onclick="getGpsAddress()" class="bg-blue-600 text-white p-3 rounded-lg font-bold text-xs shrink-0">📍 GPS</button></div><input type="text" id="locTemplate" class="form-input text-sm" placeholder="Template Name"></div><div class="mt-6 flex justify-end gap-3"><button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button><button onclick="closeModal('location')" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button onclick="saveLoc()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Save</button></div></div>
+</div>
+
+<script>
+// === MAIN LOGIC ===
+const DURATION_MAP=[0,10,20,30,45,60,75,90,105,120,150,180,210,240,270,300,360,420,480,540,600,660,720];
+let state={settings:{},locations:[],selectedLocationId:null,visitDurationMinutes:0,activeVisit:null,cachedForms:{},pendingUploads:[],globalForms:[],photoStore:{},lowBatSent:false,meta:{},isHighRisk:false};
+let synth,checkinIntervalId,mainScreenReminderTimer,wakeLock,timerInt,travellingInterval;
+let tempPhoto=null,sigPad=null,panicTapCount=0,panicTapTimer,deferredPrompt;
+let isMidVisitUpdate=false,currentActiveTemplate="",currentBatteryLevel="100%";
+let calculatedDist=null;let gpsWarm=false;
+
+// AUDIO HANDLER - Suppress Errors
+async function initAudio(){
+    if(typeof Tone !== 'undefined' && !synth){
+        try { await Tone.start(); synth=new Tone.Synth().toDestination(); } catch(e){ console.log("Audio silent"); }
+    }
+}
+function playSound(t){
+    initAudio().then(()=>{
+        if(!synth) return;
+        const n=Tone.now();
+        if(t==='arrive')synth.triggerAttackRelease("C4","8n",n);
+        if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n);navigator.vibrate([1000,500,1000]);}
+        if(t==='depart')synth.triggerAttackRelease("G4","8n",n);
+        if(t==='warning')synth.triggerAttackRelease("E5","16n",n);
+        if(t==='panic')synth.triggerAttackRelease("G5","16n",n);
+        if(t==='checkin')synth.triggerAttackRelease("A5","8n",n);
+    });
+}
+
+// UI HELPERS
+function showModal(id){document.getElementById('modalBackdrop').classList.remove('hidden');document.getElementById('modalBackdrop').classList.add('flex');document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden');if(id==='template')document.getElementById('templateModal').classList.remove('hidden');}
+function closeModal(id){document.getElementById('modalBackdrop').classList.add('hidden');document.getElementById('modalBackdrop').classList.remove('flex');document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden'));}
+window.addEventListener('online',updateNetworkStatus);window.addEventListener('offline',updateNetworkStatus);
+function updateNetworkStatus(){const b=document.getElementById('offlineBanner');if(navigator.onLine){b.classList.add('hidden');if(state.pendingUploads&&state.pendingUploads.length>0)processUploadQueue();}else{b.classList.remove('hidden');}}
+function getDeviceID(){let id=localStorage.getItem('device_uuid');if(!id){id='dev_'+Math.random().toString(36).substr(2,9)+'_'+Date.now();localStorage.setItem('device_uuid',id);}return id;}
+function navigate(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p+'Page').classList.add('active');if(p==='main')startReminderTimer();else clearTimeout(mainScreenReminderTimer);if(p==='settings'){document.getElementById('appVersionDisplay').innerText=CONFIG.version || "v93.0";}}
+
+// WIZARD
+function startWizard(){document.getElementById('setupWizard').classList.remove('hidden');wizGoTo(1);if(state.settings.workerName)populateWizard();}
+function wizGoTo(step){document.querySelectorAll('.wizard-step').forEach(e=>e.classList.remove('active'));document.getElementById('wizStep'+step).classList.add('active');for(let i=1;i<=3;i++){const d=document.getElementById('dot'+i);d.classList.toggle('bg-blue-500',i===step);d.classList.toggle('bg-gray-700',i!==step);}}
+function wizNext(current){if(current===1){if(!document.getElementById('wiz_name').value)return alert("Enter Name");wizGoTo(2);}else if(current===2){if(document.getElementById('wiz_pin').value.length<4)return alert("Set PIN");wizGoTo(3);}}
+function wizBack(current){wizGoTo(current-1);}
+function wizSave(){
+    state.settings.workerName=document.getElementById('wiz_name').value;
+    state.settings.workerPhone=cleanGlobalPhone(document.getElementById('wiz_phone').value);
+    state.settings.workerEmail=document.getElementById('wiz_email').value;
+    state.settings.emergencyName=document.getElementById('wiz_emg_name').value;
+    state.settings.emergencyPhone=cleanGlobalPhone(document.getElementById('wiz_emg_phone').value);
+    state.settings.escalationName=document.getElementById('wiz_esc_name').value;
+    state.settings.escalationPhone=cleanGlobalPhone(document.getElementById('wiz_esc_phone').value);
+    state.settings.escalationEmail=document.getElementById('wiz_esc_email').value;
+    state.settings.pinCode=document.getElementById('wiz_pin').value;
+    state.settings.duressPin=document.getElementById('wiz_duress').value;
+    saveState();document.getElementById('setupWizard').classList.add('hidden');navigate('main');forceSync();
+}
+function cleanGlobalPhone(num) {if(!num)return "";let n=num.replace(/[^0-9]/g,'');return "+"+n;}
+function populateWizard(){document.getElementById('wiz_name').value=state.settings.workerName||"";document.getElementById('wiz_pin').value=state.settings.pinCode||"";}
+function toggleHighRisk() {state.isHighRisk = document.getElementById('chkHighRisk').checked;document.getElementById('iconHighRisk').classList.toggle('hidden',!state.isHighRisk);saveState();}
+function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
+
+// CORE FUNCTIONS (SYNC & UPLOAD)
+
+function forceSync(){
+    if(!state.settings.workerName)return alert("Please enter your name in Settings first.");
+    document.getElementById('uploadBanner').classList.remove('hidden');
+    
+    // READ CONFIG FROM WINDOW OR STORAGE
+    let activeUrl = CONFIG.url;
+    if(window.OTG_CONFIG && window.OTG_CONFIG.url) activeUrl = window.OTG_CONFIG.url;
+    else {
+        try { 
+            const saved = JSON.parse(localStorage.getItem('otg_config'));
+            if(saved && saved.url) activeUrl = saved.url;
+        } catch(e){}
+    }
+
+    if(!activeUrl || activeUrl.length < 10) return alert("FATAL ERROR: No Server URL configured. Re-install App.");
+
+    const dId=getDeviceID();
+    fetch(`${activeUrl}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
+    .then(r=>r.text())
+    .then(txt=>{
+        if(!txt.trim().startsWith("{")) throw new Error("Invalid Server Response (Not JSON)");
+        return JSON.parse(txt);
+    })
+    .then(data=>{
+        if(data.status==="error"){ 
+            alert("⚠️ SERVER ERROR:\n" + data.message); 
+            if(data.message.includes("ACCESS DENIED")) startWizard();
+            document.getElementById('uploadBanner').classList.add('hidden');
+            return;
+        }
+        if(!Array.isArray(data.sites)) throw new Error("Invalid Data: Missing Sites List");
+        
+        const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));
+        const ms=data.sites.map(s=>({id:'site_'+s.siteName.replace(/\s/g,''),name:s.siteName,address:s.address,companyName:s.company,templateName:s.template,noReport:false,contactName:s.contactName,contactPhone:s.contactPhone,contactEmail:s.contactEmail,notes:s.notes}));
+        if(CONFIG.mileage)ms.unshift({id:'travel',name:'Travelling',address:'Calculates Mileage via GPS',noReport:!CONFIG.reqTravelReport,companyName:'Internal',templateName:'Travel Report'});
+        state.locations=ms.concat(existingManual);
+        state.globalForms=data.forms||[];
+        state.cachedForms=data.cachedTemplates||{};
+        state.meta=data.meta||{};
+        if(!state.cachedForms["Standard Visit Note"]&&!state.cachedForms["(Standard)"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];
+        state.cachedForms["Note to Self"]=[{type:'text',text:'Note'},{type:'photo',text:'Attachment'}];
+        if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];
+        const tLoc = state.locations.find(x => x.id === 'travel');
+        const userPref = localStorage.getItem('otg_user_travel_pref');
+        if (tLoc && userPref !== null) {tLoc.noReport = (userPref === 'true');}
+        saveState();
+        renderLocations();
+        checkVehicleStatus();
+        document.getElementById('uploadBanner').classList.add('hidden');
+        alert("Sync Complete!");
+    })
+    .catch(e=>{
+        document.getElementById('uploadBanner').classList.add('hidden');
+        alert("Sync Failed: "+e.message);
+    });
+}
+
+
+function processUploadQueue(d){
+    if(d)state.pendingUploads.push(d);
+    if(navigator.onLine&&state.pendingUploads.length){
+        const fd=new FormData();
+        for(let k in state.pendingUploads[0])fd.append(k,state.pendingUploads[0][k]);
+        
+        // WRITE FIX: Use Global CONFIG.url
+        fetch(CONFIG.url,{method:'POST',body:fd})
+        .then(r=>r.json())
+        .then(res=>{
+            if(res.status==='success'){ state.pendingUploads.shift(); saveState(); processUploadQueue(); }
+            else { console.warn("Server Rejected", res); }
+        })
+        .catch(e=>console.warn("Upload Pending",e));
+    }
+    saveState();
+}
+
+function buildPayload(d){
+    let dt="",ln="Unknown",la="",gps=d['Last Known GPS']||"";
+    if(state.activeVisit){
+        if(state.activeVisit.anticipatedDepartureTime)dt=new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
+        const l=state.locations.find(x=>x.id===state.activeVisit.locationId);
+        if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}
+        if(!gps) gps=state.activeVisit.startGPS;
+    }
+    return {'key':CONFIG.key,'Worker Name':state.settings.workerName,'Worker Phone Number':state.settings.workerPhone,'Alarm Status':"OK",...d,'Location Name':ln,'Location Address':la,'Anticipated Departure Time':dt,'Timestamp':new Date().toISOString(),deviceId:getDeviceID(),'Last Known GPS':gps};
+}
+
+function checkVehicleStatus(){if(!state.meta.lastVehCheck)document.getElementById('vehNagBar').classList.remove('hidden');else document.getElementById('vehNagBar').classList.add('hidden');}
+function startVehicleCheck(){loadFormAndShow('Vehicle Safety Check');}
+function openQuickMenu(){isMidVisitUpdate=false;showModal('template');renderIconGrid(state.globalForms,null);}
+function openMidVisitMenu(){isMidVisitUpdate=true;showModal('template');const l=state.locations.find(x=>x.id===state.activeVisit.locationId);renderIconGrid(state.globalForms,l);}
+function renderIconGrid(forms,l){const el=document.getElementById('templateList');el.innerHTML='';if(l&&l.templateName)addGridBtn(l.templateName,"🏢",el);addGridBtn("Note to Self","📝",el);forms.forEach(f=>addGridBtn(f.name,"📋",el));}
+function addGridBtn(n,i,p){const b=document.createElement('button');b.className="menu-icon-btn";b.innerHTML=`<div class="text-3xl">${i}</div><div class="text-xs font-bold">${n}</div>`;b.onclick=()=>{closeModal('template');loadFormAndShow(n);};p.appendChild(b);}
+function renderLocations(){const l=document.getElementById('locationList');l.innerHTML='';state.locations.forEach(loc=>{const d=document.createElement('div');d.className=`p-4 rounded-lg border-2 ${state.selectedLocationId===loc.id?'border-blue-500 bg-blue-900':'border-transparent bg-gray-900'} cursor-pointer mb-2`;d.innerHTML=`<div class="font-bold">${loc.companyName}</div><div class="text-sm text-gray-400">${loc.name}</div>`;d.onclick=()=>{state.selectedLocationId=loc.id;renderLocations();updateArrivedButtonState();};l.appendChild(d);});}
+function updateArrivedButtonState(){const b=document.getElementById('btnStart');if(state.selectedLocationId){b.disabled=false;b.innerText="HOLD TO START";b.className="long-press-btn flex-[2] py-4 bg-green-600 text-white font-bold rounded-xl text-xl";setupLongPress(b,startVisit);}else{b.disabled=true;b.innerText="Select Location";b.className="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl";}}
+function startVisit(){
+    const s=state.locations.find(x=>x.id===state.selectedLocationId);
+    const m=DURATION_MAP[document.getElementById('durationSlider').value];
+    if(m===0)return alert("Set Duration");
+    state.activeVisit={locationId:s.id,startTime:new Date(),anticipatedDepartureTime:new Date(Date.now()+m*60000),startGPS:""};
+    saveState();enterLockedScreen();
+    navigator.geolocation.getCurrentPosition(p=>{state.activeVisit.startGPS=`${p.coords.latitude},${p.coords.longitude}`;saveState();processUploadQueue(buildPayload({"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":"Started"}));});
+}
+function enterLockedScreen(){const l=state.locations.find(x=>x.id===state.activeVisit.locationId);document.getElementById('lockedLocationName').innerText=l.name;navigate('locked');timerInt=setInterval(tick,1000);setupLongPress(document.getElementById('btnDepart'),()=>preDepart());setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend'));}
+function tick(){
+    if(!state.activeVisit){clearInterval(timerInt);return;}
+    const rem=new Date(state.activeVisit.anticipatedDepartureTime)-Date.now();
+    const m=Math.floor(rem/60000),s=Math.floor((rem%60000)/1000);
+    document.getElementById('countdownTimer').innerText=`${m}:${s<10?'0':''}${s}`;
+    if(rem<=0){document.getElementById('overdueLabel').classList.remove('hidden');if(rem<-900000 && !state.activeVisit.criticalSent){state.activeVisit.criticalSent=true;triggerAutoAlert("EMERGENCY - OVERDUE");}}
+}
+function preDepart(){loadFormAndShow('Standard Visit');}
+function loadFormAndShow(t){showModal('report');document.getElementById('reportTitle').innerText=t;currentActiveTemplate=t;buildReportForm(t);const b=document.getElementById('btnSubmitRep');b.innerText="SUBMIT";b.onclick=submitReport;}
+function buildReportForm(n){const c=document.getElementById('reportFields');c.innerHTML='<label class="block text-gray-400 text-sm">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';}
+function submitReport(){
+    const n=document.getElementById('rep_notes').value;
+    processUploadQueue(buildPayload({"Alarm Status":state.activeVisit?"DEPARTED":"DATA_ENTRY_ONLY","Notes":n,"Template Name":currentActiveTemplate}));
+    state.activeVisit=null;saveState();closeModal('report');navigate('main');playSound('depart');
+}
+function setupLongPress(btn,cb){let t;btn.onmousedown=btn.ontouchstart=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing');},1000);};btn.onmouseup=btn.ontouchend=btn.onmouseleave=()=>{clearTimeout(t);btn.classList.remove('pressing');};}
+function getGpsAddress(){navigator.geolocation.getCurrentPosition(p=>{document.getElementById('locAddr').value=`${p.coords.latitude},${p.coords.longitude}`;});}
+function confirmExtension(m){state.activeVisit.anticipatedDepartureTime=new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime()+m*60000);saveState();closeModal('extend');processUploadQueue(buildPayload({"Alarm Status":"EXTENDED","Notes":`+${m}m`}));}
+function handlePanicTap(){const n=Date.now();if(n-panicTapTimer>2000)panicTapCount=0;panicTapCount++;panicTapTimer=n;if(panicTapCount>=3)triggerPanic();}
+function triggerPanic(){processUploadQueue(buildPayload({"Alarm Status":"EMERGENCY - PANIC","Notes":"Panic Button"}));alert("SOS SENT");}
+function toggleBatterySaver(){document.getElementById('batterySaver').classList.toggle('hidden');}
+function clearData(){localStorage.clear();location.reload();}
+function deleteLoc(){const id=document.getElementById('locId').value;state.locations=state.locations.filter(x=>x.id!==id);saveState();renderLocations();closeModal('location');}
+function openLocModal(){showModal('location');document.getElementById('locId').value='';document.getElementById('btnDelLoc').classList.add('hidden');}
+function saveLoc(){const n=document.getElementById('locName').value;if(!n)return;state.locations.push({id:'loc_'+Date.now(),name:n,companyName:document.getElementById('locBusiness').value,address:document.getElementById('locAddr').value});saveState();renderLocations();closeModal('location');}
+
+// INIT
+window.addEventListener('load',()=>{
+    if(typeof CONFIG !== 'undefined' && CONFIG.org) document.getElementById('headerOrgName').innerText = CONFIG.org;
+    const s=localStorage.getItem('loneWorkerState');
+    if(s)state={...state,...JSON.parse(s)};
+    if(!state.settings.workerName)startWizard();
+    else if(state.activeVisit)enterLockedScreen();
+    else {navigate('main');renderLocations();checkVehicleStatus();}
+    document.body.addEventListener('click',initAudio,{once:true});
+    if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+});
+</script>
+</body>
+</html>
